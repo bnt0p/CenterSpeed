@@ -14,21 +14,21 @@ namespace CenterSpeed;
 
 public class CenterSpeed : IModSharpModule, IGameListener, IClientListener
 {
-    string IModSharpModule.DisplayName   => "Center Speed";
+    string IModSharpModule.DisplayName => "Center Speed";
     string IModSharpModule.DisplayAuthor => "Lethal & Retro";
 
-    int IGameListener.ListenerVersion  => IGameListener.ApiVersion;
+    int IGameListener.ListenerVersion => IGameListener.ApiVersion;
     int IGameListener.ListenerPriority => 0;
 
-    int IClientListener.ListenerVersion  => IClientListener.ApiVersion;
+    int IClientListener.ListenerVersion => IClientListener.ApiVersion;
     int IClientListener.ListenerPriority => 0;
 
-    private readonly string                _sharpPath;
-    private readonly ISharedSystem         _sharedSystem;
-    private readonly IClientManager        _clientManager;
-    private readonly ITransmitManager      _transmitManager;
+    private readonly string _sharpPath;
+    private readonly ISharedSystem _sharedSystem;
+    private readonly IClientManager _clientManager;
+    private readonly ITransmitManager _transmitManager;
     private readonly ILogger<CenterSpeed> _logger;
-    private readonly IModSharp             _modSharp;
+    private readonly IModSharp _modSharp;
     private readonly IEntityManager _entityManager;
     private readonly IHookManager _hookManager;
     private readonly ISharpModuleManager _modules;
@@ -39,9 +39,9 @@ public class CenterSpeed : IModSharpModule, IGameListener, IClientListener
     private readonly PlayerHudState?[] _huds = new PlayerHudState?[64];
     private readonly PlayerHudSettings?[] _playerSettings = new PlayerHudSettings?[64];
     private float[] _lastSpeed = new float[64];
-    private IBaseEntity?               _sharedTarget;
+    private IBaseEntity? _sharedTarget;
     private IConVar? _particleConVar;
-    
+
     private Dictionary<int, int> _digitMap = new()
     {
         [0] = 1,
@@ -58,7 +58,7 @@ public class CenterSpeed : IModSharpModule, IGameListener, IClientListener
 
     private class PlayerHudSettings
     {
-        public float[] DigitOffsets = {-1.4f, -0.45f, 0.45f, 1.4f};
+        public float[] DigitOffsets = { -1.4f, -0.45f, 0.45f, 1.4f };
 
         public float HudScale = 0.04f;
         public float YOffset = -1f;
@@ -73,22 +73,22 @@ public class CenterSpeed : IModSharpModule, IGameListener, IClientListener
     }
 
     public CenterSpeed(
-        ISharedSystem  sharedSystem,
-        string         dllPath,
-        string         sharpPath,
-        Version        version,
+        ISharedSystem sharedSystem,
+        string dllPath,
+        string sharpPath,
+        Version version,
         IConfiguration configuration,
-        bool           hotReload)
+        bool hotReload)
     {
-        _sharedSystem    = sharedSystem;
-        _clientManager   = sharedSystem.GetClientManager();
-        _entityManager   = sharedSystem.GetEntityManager();
-        _modSharp        = sharedSystem.GetModSharp();
-        _logger          = sharedSystem.GetLoggerFactory().CreateLogger<CenterSpeed>();
+        _sharedSystem = sharedSystem;
+        _clientManager = sharedSystem.GetClientManager();
+        _entityManager = sharedSystem.GetEntityManager();
+        _modSharp = sharedSystem.GetModSharp();
+        _logger = sharedSystem.GetLoggerFactory().CreateLogger<CenterSpeed>();
         _transmitManager = sharedSystem.GetTransmitManager();
-        _hookManager     = sharedSystem.GetHookManager();
-        _modules         = sharedSystem.GetSharpModuleManager();
-        _sharpPath       = sharpPath;
+        _hookManager = sharedSystem.GetHookManager();
+        _modules = sharedSystem.GetSharpModuleManager();
+        _sharpPath = sharpPath;
     }
 
     public bool Init()
@@ -98,16 +98,16 @@ public class CenterSpeed : IModSharpModule, IGameListener, IClientListener
 
         var convarManager = _sharedSystem.GetConVarManager();
         _particleConVar = convarManager.CreateConVar("ms_cspeed_particle", "particles/digits_x/digits_x.vpcf");
-        
+
         _clientManager.InstallCommandCallback("hudsettings", OnHudSettingsCommand);
 
         _logger.LogInformation("CenterSpeed loaded");
-        
+
         _hookManager.PlayerRunCommand.InstallHookPost(PlayerRunCommandPost);
         _hookManager.PlayerSpawnPost.InstallForward(OnPlayerSpawned);
         _hookManager.PlayerKilledPost.InstallForward(OnPlayerKilled);
         _hookManager.HandleCommandJoinTeam.InstallHookPost(OnPlayerTeamChanged);
-        
+
         OnResourcePrecache();
         return true;
     }
@@ -121,7 +121,7 @@ public class CenterSpeed : IModSharpModule, IGameListener, IClientListener
     {
         _clientManager.RemoveClientListener(this);
         _sharedSystem.GetModSharp().RemoveGameListener(this);
-        
+
         _hookManager.PlayerRunCommand.RemoveHookPost(PlayerRunCommandPost);
         _hookManager.PlayerSpawnPost.RemoveForward(OnPlayerSpawned);
         _callback?.Dispose();
@@ -152,12 +152,12 @@ public class CenterSpeed : IModSharpModule, IGameListener, IClientListener
     {
         _playerSettings[client.Slot] = new();
     }
-    
+
     private void OnPlayerSpawned(IPlayerSpawnForwardParams param)
     {
         SpawnPlayerHud(param.Client);
     }
-    
+
     private void OnPlayerKilled(IPlayerKilledForwardParams param)
     {
         KillPlayerHud(param.Client.Slot);
@@ -177,12 +177,12 @@ public class CenterSpeed : IModSharpModule, IGameListener, IClientListener
         if (!client.IsValid || client.IsFakeClient)
             return;
 
-        var slot = (byte) client.Slot;
+        var slot = (byte)client.Slot;
         if (client.GetPlayerController()?.Team < CStrikeTeam.TE)
             return;
 
         KillPlayerHud(slot); // clear any stale state
-        
+
 
         if (_sharedTarget is null || !_sharedTarget.IsValid())
         {
@@ -200,10 +200,10 @@ public class CenterSpeed : IModSharpModule, IGameListener, IClientListener
             }
             _sharedTarget = target;
         }
-        
+
 
         // Lazy-init the one shared info_target (never modified after creation).
-        
+
         var state = new PlayerHudState();
         var settings = _playerSettings[client.Slot];
         if (settings is null)
@@ -215,13 +215,13 @@ public class CenterSpeed : IModSharpModule, IGameListener, IClientListener
         if (!settings.Enabled) return;
 
         var particleName = _particleConVar?.GetString() ?? "particles/numbers/number_x.vpcf";
-        
+
 
         for (var i = 0; i < 4; i++)
         {
             var kv = new Dictionary<string, KeyValuesVariantValueItem>
             {
-                ["effect_name"]  = particleName,
+                ["effect_name"] = particleName,
                 ["start_active"] = "0"
             };
 
@@ -233,15 +233,15 @@ public class CenterSpeed : IModSharpModule, IGameListener, IClientListener
                 _logger.LogWarning("SpawnPlayerHud: failed to spawn digit {Index} for slot {Slot}", i, slot);
                 continue;
             }
-            
+
             particle.GetControlPointEntities()[17] = _sharedTarget.Handle;
 
-            particle.DataControlPoint      = 33;
+            particle.DataControlPoint = 33;
             particle.DataControlPointValue = new Vector(settings.DigitOffsets[i], settings.YOffset, 0f);
 
-            SetControlPointValue(particle, 32, new Vector(0f,       0f,   0f)); // digit frame (0)
-            SetControlPointValue(particle, 34, new Vector(settings.HudScale, 0f,   0f)); // scale
-            SetControlPointValue(particle, 16, new Vector(255f,     255f, 255f)); // color
+            SetControlPointValue(particle, 32, new Vector(0f, 0f, 0f)); // digit frame (0)
+            SetControlPointValue(particle, 34, new Vector(settings.HudScale, 0f, 0f)); // scale
+            SetControlPointValue(particle, 16, new Vector(255f, 255f, 255f)); // color
 
             particle.AcceptInput("Start");
             particle.Active = true;
@@ -257,44 +257,43 @@ public class CenterSpeed : IModSharpModule, IGameListener, IClientListener
     {
         var state = _huds[slot];
         if (state == null) return;
+
+        // Mark disposed first so RunCommand skips immediately
         state.IsDisposed = true;
+        _huds[slot] = null;
+        _lastSpeed[slot] = 0;
 
         foreach (var particle in state.Digits)
         {
-            if (particle is null || !particle.IsValid())
-                continue;
-            
-            var assignments   = particle.GetServerControlPointAssignments();
-            var controlPoints = particle.GetServerControlPoints();
-            for (var i = 0; i < 4; i++)
+            if (particle == null || !particle.IsValid()) continue;
+
+            // Hide from ALL controllers before destroying
+            foreach (var con in _entityManager.GetPlayerControllers(true))
             {
-                assignments[i]   = 255;
-                controlPoints[i] = new Vector(0f, 0f, 0f);
+                _transmitManager.SetEntityState(particle.Index, con.Index, false, -1);
             }
-            particle.GetControlPointEntities()[17] = particle.GetControlPointEntities()[16];
 
-            _modSharp.InvokeFrameAction(() =>
+            // Stop the particle effect
+            particle.AcceptInput("Stop");
+            particle.Active = false;
+
+            // Schedule kill on next tick to give transmit update time to propagate
+            _modSharp.PushTimer(() =>
             {
-                particle.AcceptInput("StopPlayEndCap");
-                particle.AcceptInput("Stop");
-                particle.AcceptInput("KillHierarchy");
-                particle.AcceptInput("Kill");
-                particle.AcceptInput("DestroyImmediately");
-                particle.Kill();
-            });
+                if (particle.IsValid())
+                    particle.Kill();
+            }, 0.1f);
         }
-
-        _huds[slot] = null;
     }
 
     // -------------------------------------------------------------------------
     // Update timer — runs every 0.1 s
-    
+
     private void PlayerRunCommandPost(IPlayerRunCommandHookParams param, HookReturnValue<EmptyHookReturn> retValue)
     {
         if (_modSharp.GetGlobals().TickCount % 10 == 0)
             return;
-        
+
         var client = param.Client;
         var state = _huds[client.Slot];
 
@@ -303,17 +302,17 @@ public class CenterSpeed : IModSharpModule, IGameListener, IClientListener
             KillPlayerHud(client.Slot);
             return;
         }
-        
+
         if (state == null || state.IsDisposed) return;
 
         var controller = client.GetPlayerController();
         if (controller == null || controller.ConnectedState != PlayerConnectedState.PlayerConnected)
             return;
-            
+
 
         // Default to 0 so dead/spectating players show "0000".
         var speed = 0;
-        var pawn  = controller.GetPlayerPawn();
+        var pawn = controller.GetPlayerPawn();
 
         if (pawn != null)
         {
@@ -338,12 +337,13 @@ public class CenterSpeed : IModSharpModule, IGameListener, IClientListener
             }
 
             var digit = _digitMap.GetValueOrDefault(digits[i], 1);
-            
-            SetControlPointValue(particle, 32, new Vector((float) digit, 0f, 0f));
+
+            SetControlPointValue(particle, 32, new Vector((float)digit, 0f, 0f));
             if (_lastSpeed[client.Slot] > speed)
             {
                 SetControlPointValue(particle, 16, new Vector(255f, 0f, 0f));
-            }else if (_lastSpeed[client.Slot] < speed)
+            }
+            else if (_lastSpeed[client.Slot] < speed)
             {
                 SetControlPointValue(particle, 16, new Vector(0f, 255f, 0f));
             }
@@ -352,19 +352,27 @@ public class CenterSpeed : IModSharpModule, IGameListener, IClientListener
                 SetControlPointValue(particle, 16, new Vector(255f, 255f, 255f));
             }
         }
-        
+
         _lastSpeed[client.Slot] = speed;
 
-        
+
 
         // Transmit: visible only to the owning player.
         for (var i = 0; i < 4; i++)
         {
             var particle = state.Digits[i];
             if (particle == null) continue;
-        
-            foreach(var con in _entityManager.GetPlayerControllers(true).Where(con => !con.IsFakeClient))
-                _transmitManager.SetEntityState(particle.Index, con.Index, con.PlayerSlot == client.Slot && !state.IsDisposed, -1);
+
+            if (state.IsDisposed) return;
+
+            foreach (var con in _entityManager.GetPlayerControllers(true).Where(con => !con.IsFakeClient))
+            {
+                bool shouldSee = (con.PlayerSlot == client.Slot
+                    && _playerSettings[client.Slot]?.Enabled == true
+                    && !state.IsDisposed);
+
+                _transmitManager.SetEntityState(particle.Index, con.Index, shouldSee, -1);
+            }
         }
     }
 
@@ -396,8 +404,8 @@ public class CenterSpeed : IModSharpModule, IGameListener, IClientListener
             }
 
             index1 = Math.Clamp(index1, 1, 4);
-            value  = Math.Clamp(value, -10f, 10f);
-            var i  = index1 - 1;
+            value = Math.Clamp(value, -10f, 10f);
+            var i = index1 - 1;
 
             settings.DigitOffsets[i] = value;
             SaveSettings(client.SteamId, settings);
@@ -440,7 +448,7 @@ public class CenterSpeed : IModSharpModule, IGameListener, IClientListener
         {
             settings.Enabled = !settings.Enabled;
             SaveSettings(client.SteamId, settings);
-            if(settings.Enabled)
+            if (settings.Enabled)
                 SpawnPlayerHud(client);
             else
                 KillPlayerHud(client.Slot);
@@ -545,14 +553,14 @@ public class CenterSpeed : IModSharpModule, IGameListener, IClientListener
 
     private bool SetControlPointValue(IBaseParticle particle, int cpIndex, Vector value)
     {
-        var assignments   = particle.GetServerControlPointAssignments();
+        var assignments = particle.GetServerControlPointAssignments();
         var controlPoints = particle.GetServerControlPoints();
 
         for (var i = 0; i < 4; i++)
         {
             if (assignments[i] == cpIndex || assignments[i] == 255)
             {
-                assignments[i]   = (byte) cpIndex;
+                assignments[i] = (byte)cpIndex;
                 controlPoints[i] = value;
                 return true;
             }
