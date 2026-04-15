@@ -274,6 +274,7 @@ public class CenterSpeed : IModSharpModule, IGameListener, IClientListener
 
             // Stop the particle effect
             particle.AcceptInput("Stop");
+            particle.AcceptInput("DestroyImmediately");
             particle.Active = false;
 
             // Schedule kill on next tick to give transmit update time to propagate
