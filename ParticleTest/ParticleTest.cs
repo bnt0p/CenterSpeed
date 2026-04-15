@@ -59,6 +59,8 @@ public class ParticleTest : IModSharpModule, IGameListener, IClientListener
         public float[] DigitOffsets = {-1.4f, -0.45f, 0.45f, 1.4f};
 
         public float HudScale = 0.04f;
+        public float YOffset = -1f;
+        public bool Enabled = true;
     }
 
     private class PlayerHudState
@@ -95,7 +97,8 @@ public class ParticleTest : IModSharpModule, IGameListener, IClientListener
         _yOffsetConVar = convarManager.CreateConVar("ms_cspeed_y_offset", 0.0f);
         
         // _clientManager.InstallCommandCallback("ptest", OnParticleTestCommand);
-        
+        _clientManager.InstallCommandCallback("hudsettings", OnHudSettingsCommand);
+
         _logger.LogInformation("ParticleTest loaded");
         
         _hookManager.PlayerRunCommand.InstallHookPost(PlayerRunCommandPost);
@@ -208,6 +211,8 @@ public class ParticleTest : IModSharpModule, IGameListener, IClientListener
             _playerSettings[client.Slot] = settings;
         }
 
+        if (!settings.Enabled) return;
+
         var particleName = _particleConVar?.GetString() ?? "particles/numbers/number_x.vpcf";
         var yOffset = _yOffsetConVar?.GetFloat() ?? -3.0f;
         
@@ -234,7 +239,7 @@ public class ParticleTest : IModSharpModule, IGameListener, IClientListener
             particle.GetControlPointEntities()[17] = _sharedTarget.Handle;
 
             particle.DataControlPoint      = 33;
-            particle.DataControlPointValue = new Vector(settings.DigitOffsets[i], yOffset, 0f);
+            particle.DataControlPointValue = new Vector(settings.DigitOffsets[i], settings.YOffset, 0f);
 
             SetControlPointValue(particle, 32, new Vector(0f,       0f,   0f)); // digit frame (0)
             SetControlPointValue(particle, 34, new Vector(settings.HudScale, 0f,   0f)); // scale
@@ -345,6 +350,92 @@ public class ParticleTest : IModSharpModule, IGameListener, IClientListener
             foreach(var con in _entityManager.GetPlayerControllers(true).Where(con => !con.IsFakeClient))
                 _transmitManager.SetEntityState(particle.Index, con.Index, con.PlayerSlot == client.Slot, -1);
         }
+    }
+
+    // -------------------------------------------------------------------------
+    // !hudsettings command
+
+    private ECommandAction OnHudSettingsCommand(IGameClient client, StringCommand command)
+    {
+        var slot = client.Slot;
+        var settings = _playerSettings[slot] ??= new PlayerHudSettings();
+
+        if (command.ArgCount == 0 || command.GetArg(1).Equals("info", StringComparison.OrdinalIgnoreCase))
+        {
+            PrintHudSettings(client, settings);
+            return ECommandAction.Stopped;
+        }
+
+        var sub = command.GetArg(1).ToLowerInvariant();
+
+        if (sub == "offset")
+        {
+            if (command.ArgCount < 3 ||
+                !int.TryParse(command.GetArg(2), out var index1) ||
+                !float.TryParse(command.GetArg(3), System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out var value))
+            {
+                client.GetPlayerController()?.Print(HudPrintChannel.Chat, " [HUD] Usage: !hudsettings offset <1-4> <-10 to 10>");
+                return ECommandAction.Stopped;
+            }
+
+            index1 = Math.Clamp(index1, 1, 4);
+            value  = Math.Clamp(value, -10f, 10f);
+            var i  = index1 - 1;
+
+            settings.DigitOffsets[i] = value;
+            SpawnPlayerHud(client);
+            client.GetPlayerController()?.Print(HudPrintChannel.Chat, $" [HUD] Digit {index1} offset set to {value:F2}");
+        }
+        else if (sub == "scale")
+        {
+            if (command.ArgCount < 2 ||
+                !float.TryParse(command.GetArg(2), System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out var value))
+            {
+                client.GetPlayerController()?.Print(HudPrintChannel.Chat, " [HUD] Usage: !hudsettings scale <0-10>");
+                return ECommandAction.Stopped;
+            }
+
+            value = Math.Clamp(value, 0f, 10f);
+            settings.HudScale = value;
+            SpawnPlayerHud(client);
+            client.GetPlayerController()?.Print(HudPrintChannel.Chat, $" [HUD] Scale set to {value:F2}");
+        }
+        else if (sub == "yoffset")
+        {
+            if (command.ArgCount < 2 ||
+                !float.TryParse(command.GetArg(2), System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out var offset))
+            {
+                client.GetPlayerController()?.Print(HudPrintChannel.Chat, " [HUD] Usage: !hudsettings yoffset <-10-10>");
+                return ECommandAction.Stopped;
+            }
+
+            offset = Math.Clamp(offset, -10f, 10f);
+            settings.YOffset = offset;
+            SpawnPlayerHud(client);
+            client.GetPlayerController()?.Print(HudPrintChannel.Chat, $" [HUD] Y-Offset set to {offset:F2}");
+        }
+        else if (sub == "toggle")
+        {
+            settings.Enabled = !settings.Enabled;
+            SpawnPlayerHud(client);
+            client.GetPlayerController()?.Print(HudPrintChannel.Chat, $" [HUD] Enabled set to {settings.Enabled}");
+        }
+        else
+        {
+            client.GetPlayerController()?.Print(HudPrintChannel.Chat, " [HUD] Subcommands: offset <1-4> <-10..10> | scale <0-10> | yoffset <-10-10> | info");
+        }
+        return ECommandAction.Stopped;
+    }
+
+    private void PrintHudSettings(IGameClient client, PlayerHudSettings settings)
+    {
+        var o = settings.DigitOffsets;
+        client.GetPlayerController()?.Print(HudPrintChannel.Chat, $" [HUD] Offsets: 1={o[0]:F2}  2={o[1]:F2}  3={o[2]:F2}  4={o[3]:F2}");
+        client.GetPlayerController()?.Print(HudPrintChannel.Chat, $" [HUD] Scale: {settings.HudScale:F4}");
+        client.GetPlayerController()?.Print(HudPrintChannel.Chat, $" [HUD] Y-Offset: {settings.YOffset:F4}");
     }
 
     // -------------------------------------------------------------------------
