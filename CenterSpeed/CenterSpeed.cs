@@ -177,11 +177,8 @@ public class CenterSpeed : IModSharpModule, IGameListener, IClientListener
             return;
 
         var slot = (byte) client.Slot;
-
-        if (slot >= 64)
-        {
+        if (client.GetPlayerController()?.Team < CStrikeTeam.TE)
             return;
-        }
 
         KillPlayerHud(slot); // clear any stale state
         
