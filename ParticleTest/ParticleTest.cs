@@ -34,15 +34,11 @@ public class ParticleTest : IModSharpModule, IGameListener, IClientListener
 
     // --- Per-player HUD state ---
     private readonly PlayerHudState?[] _huds = new PlayerHudState?[64];
+    private readonly PlayerHudSettings?[] _playerSettings = new PlayerHudSettings?[64];
     private float[] _lastSpeed = new float[64];
     private IBaseEntity?               _sharedTarget;
     private IConVar? _particleConVar;
     private IConVar? _yOffsetConVar;
-
-    // --- Layout constants (adjust to taste) ---
-    private static readonly float[] DigitOffsets   = { -1.4f, -0.45f, 0.45f, 1.4f };
-    // private static readonly float[] DigitOffsets   = { 0f, 0f, 0f, 0f };
-    private const           float   HudScale       = 0.06f;
     
     private Dictionary<int, int> _digitMap = new()
     {
@@ -57,6 +53,13 @@ public class ParticleTest : IModSharpModule, IGameListener, IClientListener
         [8] = 12,
         [9] = 13,
     };
+
+    private class PlayerHudSettings
+    {
+        public float[] DigitOffsets = {-1.4f, -0.45f, 0.45f, 1.4f};
+
+        public float HudScale = 0.04f;
+    }
 
     private class PlayerHudState
     {
@@ -136,7 +139,7 @@ public class ParticleTest : IModSharpModule, IGameListener, IClientListener
     public void OnClientPostAdminCheck(IGameClient client)
     {
         _logger.LogInformation("Player joined setting 5 second timer");
-        _modSharp.PushTimer(() => SpawnPlayerHud(client), 5.0f, GameTimerFlags.None);
+        _playerSettings[client.Slot] = new();
     }
     
     private void OnPlayerSpawned(IPlayerSpawnForwardParams param)
@@ -152,6 +155,7 @@ public class ParticleTest : IModSharpModule, IGameListener, IClientListener
     public void OnClientDisconnected(IGameClient client, NetworkDisconnectionReason reason)
     {
         KillPlayerHud(client.Slot);
+        _playerSettings[client.Slot] = null;
     }
 
     // -------------------------------------------------------------------------
@@ -197,6 +201,12 @@ public class ParticleTest : IModSharpModule, IGameListener, IClientListener
         _logger.LogInformation("Spawning player hud 5");
         
         var state = new PlayerHudState();
+        var settings = _playerSettings[client.Slot];
+        if (settings is null)
+        {
+            settings = new PlayerHudSettings();
+            _playerSettings[client.Slot] = settings;
+        }
 
         var particleName = _particleConVar?.GetString() ?? "particles/numbers/number_x.vpcf";
         var yOffset = _yOffsetConVar?.GetFloat() ?? -3.0f;
@@ -224,10 +234,10 @@ public class ParticleTest : IModSharpModule, IGameListener, IClientListener
             particle.GetControlPointEntities()[17] = _sharedTarget.Handle;
 
             particle.DataControlPoint      = 33;
-            particle.DataControlPointValue = new Vector(DigitOffsets[i], yOffset, 0f);
+            particle.DataControlPointValue = new Vector(settings.DigitOffsets[i], yOffset, 0f);
 
             SetControlPointValue(particle, 32, new Vector(0f,       0f,   0f)); // digit frame (0)
-            SetControlPointValue(particle, 34, new Vector(HudScale, 0f,   0f)); // scale
+            SetControlPointValue(particle, 34, new Vector(settings.HudScale, 0f,   0f)); // scale
             SetControlPointValue(particle, 16, new Vector(255f,     255f, 255f)); // color
 
             particle.AcceptInput("Start");
