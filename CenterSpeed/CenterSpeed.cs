@@ -425,7 +425,10 @@ public class CenterSpeed : IModSharpModule, IGameListener, IClientListener
         {
             settings.Enabled = !settings.Enabled;
             SaveSettings(client.SteamId, settings);
-            SpawnPlayerHud(client);
+            if(settings.Enabled)
+                SpawnPlayerHud(client);
+            else
+                KillPlayerHud(client.Slot);
             client.GetPlayerController()?.Print(HudPrintChannel.Chat, $" [HUD] Enabled set to {settings.Enabled}");
         }
         else
