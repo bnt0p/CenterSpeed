@@ -108,7 +108,6 @@ public class CenterSpeed : IModSharpModule, IGameListener, IClientListener
         _hookManager.PlayerKilledPost.InstallForward(OnPlayerKilled);
         _hookManager.HandleCommandJoinTeam.InstallHookPost(OnPlayerTeamChanged);
 
-        OnResourcePrecache();
         return true;
     }
 
@@ -247,7 +246,6 @@ public class CenterSpeed : IModSharpModule, IGameListener, IClientListener
             particle.Active = true;
 
             state.Digits[i] = particle;
-            _transmitManager.AddEntityHooks(particle, true);
         }
 
         _huds[slot] = state;
@@ -258,7 +256,6 @@ public class CenterSpeed : IModSharpModule, IGameListener, IClientListener
         var state = _huds[slot];
         if (state == null) return;
 
-        // Mark disposed first so RunCommand skips immediately
         state.IsDisposed = true;
         _huds[slot] = null;
         _lastSpeed[slot] = 0;
@@ -267,22 +264,9 @@ public class CenterSpeed : IModSharpModule, IGameListener, IClientListener
         {
             if (particle == null || !particle.IsValid()) continue;
 
-            // Hide from ALL controllers before destroying
-            foreach (var con in _entityManager.GetPlayerControllers(true))
-            {
-                _transmitManager.SetEntityState(particle.Index, con.Index, false, -1);
-            }
-
-            // Stop the particle effect
             particle.AcceptInput("Stop");
+            particle.AcceptInput("DestroyImmediately");
             particle.Active = false;
-
-            // Schedule kill on next tick to give transmit update time to propagate
-            _modSharp.PushTimer(() =>
-            {
-                if (particle.IsValid())
-                    particle.Kill();
-            }, 0.1f);
         }
     }
 
@@ -354,26 +338,6 @@ public class CenterSpeed : IModSharpModule, IGameListener, IClientListener
         }
 
         _lastSpeed[client.Slot] = speed;
-
-
-
-        // Transmit: visible only to the owning player.
-        for (var i = 0; i < 4; i++)
-        {
-            var particle = state.Digits[i];
-            if (particle == null) continue;
-
-            if (state.IsDisposed) return;
-
-            foreach (var con in _entityManager.GetPlayerControllers(true).Where(con => !con.IsFakeClient))
-            {
-                bool shouldSee = (con.PlayerSlot == client.Slot
-                    && _playerSettings[client.Slot]?.Enabled == true
-                    && !state.IsDisposed);
-
-                _transmitManager.SetEntityState(particle.Index, con.Index, shouldSee, -1);
-            }
-        }
     }
 
     // -------------------------------------------------------------------------
@@ -531,6 +495,8 @@ public class CenterSpeed : IModSharpModule, IGameListener, IClientListener
 
         if (cp.GetCookie(id, "hud_enabled") is { } en)
             settings.Enabled = en.GetString() != "0";
+        
+        SpawnPlayerHud(client);
     }
 
     private void SaveSettings(ulong steamId, PlayerHudSettings s)
